@@ -1,5 +1,6 @@
 from database.DAO import DAO
 import networkx as nx
+import copy
 
 
 class Model:
@@ -8,6 +9,8 @@ class Model:
         self.G = None
         self.G_max = None
         self.max_vendite = None
+        self.sol_best = []
+        self.peso_best = 0
 
     def getDateRange(self):
         return DAO.getDateRange()
@@ -41,7 +44,10 @@ class Model:
                     self.G.add_edge(j.product_id, i.product_id, weight=i.num_vendite + j.num_vendite)
                     c = c
             self.G_max.nodes[i.product_id]['weight'] = c
+        print(sorted(list(self.G.edges(data="weight")), key=lambda x: x[2], reverse=True))
         return list(self.G.edges(data="weight"))
+
+    #sorted(list(self.G.edges(data="weight")), key=lambda x: x[2], reverse=True)
 
     def get_nodi(self):
         return self.G.number_of_nodes()
@@ -53,34 +59,39 @@ class Model:
         m_vend = []
         for n, a in self.G_max.nodes(data=True):
             m_vend.append((a.get("weight"), a.get("name")))
+        print(list(self.G.successors(2)))
         return sorted(m_vend, key=lambda x: x[0], reverse=True)
 
 
+    def cammino(self, lun, start, end):
+        percorso = [start]
+        for n in self.G.successors(start):
+            p = self.G[start][n]["weight"]
+            percorso.append(n)
+            self.ricorsione(lun, end, percorso, p)
+            percorso.pop()
+        return self.sol_best, self.peso_best
 
-
-    def cammino_ottimo(self):
-        self._cammino_ottimo = []
-        self._punteggio_ottimo = 0.0
-
-        for nodo in self._grafo.nodes():
-            self._calcola_cammino_ricorsivo([nodo], self._calcola_successivi(nodo))
-        return self._cammino_ottimo, self._punteggio_ottimo
-
-    def _calcola_cammino_ricorsivo(self, parziale: list[State], successivi: list[State]):
-        if len(successivi) == 0:
-            score = self._calcola_score(parziale)
-            if score > self._punteggio_ottimo:
-                self._punteggio_ottimo = score
-                self._cammino_ottimo = copy.deepcopy(parziale)
+    def ricorsione(self, lun, end, percorso, p):
+        if len(percorso) - 1 == lun:
+            if percorso[-1] == end and p > self.peso_best:
+                    self.sol_best = copy.deepcopy(percorso)
+                    self.peso_best = p
+            return
         else:
-            for nodo in successivi:
-                # aggiungo il nodo in parziale ed aggiorno le occorrenze del mese corrispondente
-                parziale.append(nodo)
-                # nuovi successivi
-                nuovi_successivi = self._calcola_successivi(nodo)
-                # ricorsione
-                self._calcola_cammino_ricorsivo(parziale, nuovi_successivi)
-                parziale.pop()
+            for n in self.G.successors(percorso[-1]):
+                if n in percorso:
+                    continue
+                peso = self.G[percorso[-1]][n]["weight"]
+                percorso.append(n)
+                self.ricorsione(lun, end, percorso, peso+p)
+                percorso.pop()
+        return
+
+
+
+
+
 
 
 
@@ -91,3 +102,4 @@ if __name__ == '__main__':
     print(Model.get_nodi())
     print(Model.get_archi())
     print(Model.max_vendita())
+    print(Model.cammino(2, 2, 114))
